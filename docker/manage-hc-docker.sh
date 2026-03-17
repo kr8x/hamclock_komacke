@@ -211,7 +211,9 @@ get_sticky_vars() {
 
 save_sticky_vars() {
     cat<<EOF > $STICKY_ENV_FILE
-STICKY_HTTP_PORT="$HTTP_PORT"
+STICKY_API_PORT="$API_PORT"
+STICKY_LIVE_PORT="$LIVE_PORT"
+STICKY_RO_PORT="$RO_PORT"
 STICKY_HC_EEPROM="$HC_EEPROM"
 STICKY_BACKEND_HOST=$BACKEND_HOST
 EOF
@@ -333,10 +335,12 @@ is_hamclock_installed() {
         RETVAL=1
         return $RETVAL
     else
-        get_current_http_port
+        get_current_live_port
         echo "  Hamclock version:      '$CURRENT_TAG'"
         echo "  Docker image:          '$CURRENT_IMAGE_BASE:$CURRENT_TAG'"
-        echo "  HTTP PORT in use:      '$CURRENT_HTTP_PORT'"
+        echo "  API port in use:       '$CURRENT_API_PORT'"
+        echo "  Live port in use:      '$CURRENT_LIVE_PORT'"
+        echo "  R/O port in use:       '$CURRENT_RO_PORT'"
         echo -n "  Backend host:          "
         if [ "$STICKY_BACKEND_HOST" == '-' ]; then
             echo "Image default"
@@ -354,7 +358,7 @@ is_hamclock_installed() {
 upgrade_hamclock() {
     is_docker_installed >/dev/null || return $?
 
-    get_current_http_port
+    get_current_live_port
     get_current_image_tag
 
     echo "Upgrading Hamclock ..."
@@ -432,7 +436,7 @@ docker_compose_down() {
 }
 
 docker_compose_reset() {
-    get_current_http_port
+    get_current_live_port
     get_current_image_tag
     docker_compose_down || return $RETVAL
     docker_compose_up
@@ -467,7 +471,7 @@ remove_hamclock() {
 }
 
 recreate_hamclock() {
-    get_current_http_port
+    get_current_live_port
     get_current_image_tag
 
     remove_hamclock || return $RETVAL
@@ -484,14 +488,14 @@ is_container_exists() {
     return $?
 }
 
-get_current_http_port() {
-    DOCKER_HTTP_PORT=$(docker inspect $CONTAINER 2>/dev/null | jq -r '.[0].HostConfig.PortBindings."8081/tcp"[0].HostPort')
-    DOCKER_HTTP_IP=$(docker inspect $CONTAINER 2>/dev/null | jq -r '.[0].HostConfig.PortBindings."8081/tcp"[0].HostIp')
-    if [ "$DOCKER_HTTP_PORT" != 'null' ]; then
-        if [ "$DOCKER_HTTP_IP" != 'null' ]; then
-            CURRENT_HTTP_PORT=$DOCKER_HTTP_IP:$DOCKER_HTTP_PORT
+get_current_live_port() {
+    DOCKER_LIVE_PORT=$(docker inspect $CONTAINER 2>/dev/null | jq -r '.[0].HostConfig.PortBindings."8081/tcp"[0].HostPort')
+    DOCKER_LIVE_IP=$(docker inspect $CONTAINER 2>/dev/null | jq -r '.[0].HostConfig.PortBindings."8081/tcp"[0].HostIp')
+    if [ "$DOCKER_LIVE_PORT" != 'null' ]; then
+        if [ "$DOCKER_LIVE_IP" != 'null' ]; then
+            CURRENT_LIVE_PORT=$DOCKER_LIVE_IP:$DOCKER_LIVE_PORT
         else
-            CURRENT_HTTP_PORT=:$DOCKER_HTTP_PORT
+            CURRENT_LIVE_PORT=:$DOCKER_LIVE_PORT
         fi
     fi
 }
@@ -504,29 +508,37 @@ get_current_image_tag() {
     fi
 }
 
-determine_http_port() {
-    get_current_http_port
+determine_live_port() {
+    get_current_live_port
 
     # first precedence
-    if [ -n "$REQUESTED_HTTP_PORT" ]; then
-        HTTP_PORT=$REQUESTED_HTTP_PORT
+    if [ -n "$REQUESTED_LIVE_PORT" ]; then
+        LIVE_PORT=$REQUESTED_LIVE_PORT
 
     # second precedence
-    elif [ -n "$CURRENT_HTTP_PORT" -a "$CURRENT_HTTP_PORT" != ':' ]; then
-        HTTP_PORT=$CURRENT_HTTP_PORT
+    elif [ -n "$CURRENT_LIVE_PORT" -a "$CURRENT_LIVE_PORT" != ':' ]; then
+        LIVE_PORT=$CURRENT_LIVE_PORT
 
     # third precedence
-    elif [ -n "$STICKY_HTTP_PORT" ]; then
-        HTTP_PORT=$STICKY_HTTP_PORT
+    elif [ -n "$STICKY_LIVE_PORT" ]; then
+        LIVE_PORT=$STICKY_LIVE_PORT
 
     # fourth precedence
     else
-        HTTP_PORT=$DEFAULT_HTTP_PORT
+        LIVE_PORT=$DEFAULT_LIVE_PORT
 
     fi
 
     # if there was a :, it was probably IP:PORT; otherwise make sure there's a colon for port only
-    [[ $HTTP_PORT =~ : ]] || HTTP_PORT=":$HTTP_PORT"
+    [[ $LIVE_PORT =~ : ]] || LIVE_PORT=":$LIVE_PORT"
+
+    if [ "$LIVE_PORT" == "-" ]; then
+        LIVE_PORT_MAPPING=""
+    else
+        # if there was a :, it was probably IP:PORT; otherwise make sure there's a colon for port only
+        [[ $LIVE_PORT =~ : ]] || LIVE_PORT=":$LIVE_PORT"
+        LIVE_PORT_MAPPING="- $LIVE_PORT:8081"
+    fi
 }
 
 determine_eeprom_file() {
@@ -618,7 +630,7 @@ determine_tag() {
 }
 
 docker_compose_yml() {
-    determine_http_port
+    determine_live_port
     determine_backend_host
     determine_eeprom_file
 
@@ -650,7 +662,9 @@ services:
     networks:
       - hamclock
     ports:
-      - "192.168.1.1:8081:8081"
+      $API_PORT_MAPPING
+      $LIVE_PORT_MAPPING
+      $RO_PORT_MAPPING
       - "[2600:1700:3ec0:83d8::1]:8081:8081"
     volumes:
       - type: bind
