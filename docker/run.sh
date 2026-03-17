@@ -7,6 +7,7 @@ if [ -n "$BACKEND_HOST" ]; then
     BACKEND_ARG="-b $BACKEND_HOST"
 fi
 
+# these values only matter if there is not a /root/.hamclock/eeprom file.
 perl hceeprom.pl NV_CALLSIGN $CALLSIGN && \
 perl hceeprom.pl NV_DE_GRID $LOCATOR && \
 perl hceeprom.pl NV_DE_LAT $LAT && \
