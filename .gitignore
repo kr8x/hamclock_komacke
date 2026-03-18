@@ -2,3 +2,4 @@
 # don't include these files in the git repo
 *.env
 eeprom
+hc.settings

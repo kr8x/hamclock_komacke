@@ -17,10 +17,12 @@ DEFAULT_TAG=$MANAGER_HC_VERSION
 GIT_TAG=$(git describe --exact-match --tags 2>/dev/null)
 GIT_VERSION=$(git rev-parse --short HEAD 2>/dev/null)
 CONTAINER=${IMAGE_BASE##*/}
-DEFAULT_HTTP_PORT=:80
-DEFAULT_EXTERNAL_HTTP_LOG=false
+DEFAULT_API_PORT=:8080
+DEFAULT_LIVE_PORT=:8081
+DEFAULT_RO_PORT=:8082
+DEFAULT_BACKEND_HOST=-
 # the following env is the lighttpd env file
-DEFAULT_ENV_FILE="$STARTED_FROM/.env"
+DEFAULT_HC_EEPROM=hc.settings
 
 # the following env is for sticky settings
 STICKY_ENV_FILE=$DOCKER_PROJECT.env
@@ -77,10 +79,6 @@ main() {
             shift && get_compose_opts "$@"
             generate_docker_compose
             ;;
-        add-env-file)
-            shift && get_compose_opts "$@"
-            copy_env_to_container
-            ;;
         upgrade-me)
             upgrade_this_script
             ;;
@@ -96,23 +94,25 @@ main() {
 }
 
 get_compose_opts() {
-    while getopts ":p:s:c:t:e:d:l:" opt; do
+    while getopts ":a:b:r:s:t:w:" opt; do
         case $opt in
-            e)
-                REQUESTED_ENV_FILE="$OPTARG"
+            a)
+                REQUESTED_API_PORT="$OPTARG"
                 ;;
-            l)
-                REQUESTED_EXTERNAL_HTTP_LOG="$OPTARG"
-                if [ "$REQUESTED_EXTERNAL_HTTP_LOG" != true -a "$REQUESTED_EXTERNAL_HTTP_LOG" != false ]; then
-                    echo "ERROR: -$opt option must be <true|false>"
-                    exit 1
-                fi
+            b)
+                REQUESTED_BACKEND_HOST="$OPTARG"
                 ;;
-            p)
-                REQUESTED_HTTP_PORT="$OPTARG"
+            r)
+                REQUESTED_RO_PORT="$OPTARG"
+                ;;
+            s)
+                REQUESTED_HC_SETTINGS="$OPTARG"
                 ;;
             t)
                 REQUESTED_TAG="$OPTARG"
+                ;;
+            w)
+                REQUESTED_LIVE_PORT="$OPTARG"
                 ;;
             \?) # Handle invalid options
                 echo "Command '$COMMAND': Invalid option: -$OPTARG" >&2
@@ -138,21 +138,30 @@ $THIS <COMMAND> [options]:
             checks docker requirements and shows version
 
     check-hamclock-install:
-            checkif Hamclock is installed and report versions
+            check if Hamclock is installed and report versions
 
-    install [-p <port>] [-t <tag>]
+    install [-a <port>] [-r <port>] [-w <port>] [-t <tag>] [-b <backend host:port>]
             do a fresh install and optionally provide the version
-            -p: set the HTTP port
+            -b: set backend host
+            -a: set the HTTP API port
+            -r: set the read-only live web port
+            -w: set the read-write live web port
             -t: set image tag
 
-    upgrade [-p <port>] [-t <tag>]
+    upgrade [-a <port>] [-r <port>] [-w <port>] [-t <tag>] [-b <backend host:port>]
             upgrade hamclock; defaults to current git tag if there is one. Otherwise you can provide one.
-            -p: set the HTTP port (defaults to current setting)
+            -b: set backend host
+            -a: set the HTTP API port
+            -r: set the read-only live web port
+            -w: set the read-write live web port
             -t: set image tag
 
-    full-reset [-p <port>] [-t <tag>]: 
+    full-reset [-a <port>] [-r <port>] [-w <port>] [-t <tag>] [-b <backend host:port>]
             clear out all data and start fresh
-            -p: set the HTTP port (defaults to current setting)
+            -b: set backend host
+            -a: set the HTTP API port
+            -r: set the read-only live web port
+            -w: set the read-write live web port
             -t: set image tag
 
     reset:
@@ -161,27 +170,26 @@ $THIS <COMMAND> [options]:
     restart:
             restarts the Hamclock container. No file contents modified
 
-    up [-p <port>] [-t <tag>]
+    up [-a <port>] [-r <port>] [-w <port>] [-t <tag>] [-b <backend host:port>]
             start an existing, not-running Hamclock install; defaults to current git tag if there is one. Otherwise you can provide one.
-            -p: set the HTTP port (defaults to current setting)
+            -b: set backend host
+            -a: set the HTTP API port
+            -r: set the read-only live web port
+            -w: set the read-write live web port
             -t: set image tag
 
     down
-            stop a running Hamclock install
+            stop a running Hamclock install; resets the Hamclock container
 
     remove: 
-            stop and remove the docker container, docker storage and docker image
+            stop and remove the docker container, docker image, and configuration
 
-    add-env-file [-e <env file>]:
-            add .env to Hamclock. Defaults a file named '.env' in your PWD. The
-            .env file contains secrets such as api keys for services. If Hamclock
-            was already running, it needs to be restarted for the file
-            to take effect. See the restart command. See .env.example for more info.
-            -e: .env file location
-
-    generate-docker-compose [-p <port>] [-t <tag>]: 
+    generate-docker-compose [-a <port>] [-r <port>] [-w <port>] [-t <tag>] [-b <backend host:port>]
             writes the docker compose file to STDOUT
-            -p: set the HTTP port (defaults to current setting)
+            -b: set backend host
+            -a: set the HTTP API port
+            -r: set the read-only live web port
+            -w: set the read-write live web port
             -t: set image tag
 
     upgrade-me:
@@ -203,9 +211,11 @@ get_sticky_vars() {
 
 save_sticky_vars() {
     cat<<EOF > $STICKY_ENV_FILE
-STICKY_HTTP_PORT="$HTTP_PORT"
-STICKY_LIGHTTPD_ENV_FILE="$ENV_FILE"
-STICKY_EXTERNAL_HTTP_LOG="$ENABLE_EXTERNAL_HTTP_LOG"
+STICKY_API_PORT="$API_PORT"
+STICKY_LIVE_PORT="$LIVE_PORT"
+STICKY_RO_PORT="$RO_PORT"
+STICKY_HC_EEPROM="$HC_EEPROM"
+STICKY_BACKEND_HOST=$BACKEND_HOST
 EOF
 }
 
@@ -265,6 +275,13 @@ EOF
 install_hamclock() {
     is_docker_installed >/dev/null || return $?
 
+    determine_backend_host
+    if is_backend_image_default; then
+        echo
+        echo "WARNING: backend host not set. Using image default. Consider the '-b' option."
+        echo
+    fi
+
     echo "Installing Hamclock ..."
 
     echo "Starting the container ..."
@@ -275,6 +292,14 @@ install_hamclock() {
         return $RETVAL
     fi
     return $RETVAL
+}
+
+is_backend_image_default() {
+    if [ "$BACKEND_HOST" == "-" ]; then
+        return 0
+    else
+        return 1
+    fi
 }
 
 is_hamclock_installed() {
@@ -302,6 +327,7 @@ is_hamclock_installed() {
     fi
     echo
 
+    echo "Checking for Hamclock ..."
     get_current_image_tag
     if [ -z "$CURRENT_TAG" ]; then
         echo
@@ -309,10 +335,18 @@ is_hamclock_installed() {
         RETVAL=1
         return $RETVAL
     else
-        get_current_http_port
+        get_current_live_port
         echo "  Hamclock version:      '$CURRENT_TAG'"
         echo "  Docker image:          '$CURRENT_IMAGE_BASE:$CURRENT_TAG'"
-        echo "  HTTP PORT in use:      '$CURRENT_HTTP_PORT'"
+        echo "  API port in use:       '$CURRENT_API_PORT'"
+        echo "  Live port in use:      '$CURRENT_LIVE_PORT'"
+        echo "  R/O port in use:       '$CURRENT_RO_PORT'"
+        echo -n "  Backend host:          "
+        if [ "$STICKY_BACKEND_HOST" == '-' ]; then
+            echo "Image default"
+        else
+            echo "'$STICKY_BACKEND_HOST'"
+        fi
     fi
 
     if ! is_container_running; then
@@ -324,7 +358,7 @@ is_hamclock_installed() {
 upgrade_hamclock() {
     is_docker_installed >/dev/null || return $?
 
-    get_current_http_port
+    get_current_live_port
     get_current_image_tag
 
     echo "Upgrading Hamclock ..."
@@ -374,10 +408,7 @@ docker_compose_up() {
         docker_compose_yml && docker compose -f <(echo "$DOCKER_COMPOSE_YML") create
         RETVAL=$?
         [ $RETVAL -ne 0 ] && return $RETVAL
-        if [ -n "$REQUESTED_ENV_FILE" -o -n "$STICKY_LIGHTTPD_ENV_FILE" -o -r "$DEFAULT_ENV_FILE" ]; then
-            copy_env_to_container >/dev/null
-        fi
-        docker compose -f <(echo "$DOCKER_COMPOSE_YML") up -d
+        docker compose $INITIAL_CONFIG_FILE -f <(echo "$DOCKER_COMPOSE_YML") up -d
         RETVAL=$?
     fi
 
@@ -405,7 +436,7 @@ docker_compose_down() {
 }
 
 docker_compose_reset() {
-    get_current_http_port
+    get_current_live_port
     get_current_image_tag
     docker_compose_down || return $RETVAL
     docker_compose_up
@@ -420,6 +451,14 @@ generate_docker_compose() {
 }
 
 remove_hamclock() {
+    get_current_image_tag
+    if [ -z "$CURRENT_TAG" ]; then
+        echo
+        echo "Hamclock does not appear to installed."
+        RETVAL=1
+        return $RETVAL
+    fi
+
     echo "Stopping the container ..."
     if docker_compose_down; then
         echo "Container stopped successfully."
@@ -427,66 +466,41 @@ remove_hamclock() {
         echo "ERROR: failed to stop Hamclock with docker compose down" >&2
         return $RETVAL
     fi
+    docker rmi $IMAGE_BASE:$TAG
+    rm -f $STICKY_HC_EEPROM $STICKY_ENV_FILE
 }
 
 recreate_hamclock() {
-    get_current_http_port
+    get_current_live_port
     get_current_image_tag
 
     remove_hamclock || return $RETVAL
     install_hamclock || return $RETVAL
 }
 
-copy_env_to_container() {
-    if [ -n "$REQUESTED_ENV_FILE" ]; then
-        if [[ "$REQUESTED_ENV_FILE" == /* ]]; then
-            ENV_FILE="$REQUESTED_ENV_FILE"
-        else
-            ENV_FILE="$STARTED_FROM/$REQUESTED_ENV_FILE"
-        fi
-    elif [ -n "$STICKY_LIGHTTPD_ENV_FILE" ]; then
-        ENV_FILE="$STICKY_LIGHTTPD_ENV_FILE"
-    else
-        ENV_FILE="$DEFAULT_ENV_FILE"
-    fi
-
-    if is_container_exists; then
-        if [ -r "$ENV_FILE" ]; then
-            docker cp $ENV_FILE $CONTAINER:/opt/hamclock-backend/.env
-        else
-            echo "ERROR: ENV file not found: '$(realpath "$ENV_FILE")'" >&2
-            RETVAL=1
-        fi
-    else
-        echo "ERROR: the docker container needs to exist for this command." >&2
-        echo "Install or start Hamclock first." >&2
-        RETVAL=1
-    fi
-
-    return $RETVAL
-}
-
 is_container_running() {
-    docker ps --format '{{.Names}}' | grep -wqs $CONTAINER
+    docker ps --format '{{.Names}}' | grep -xqs $CONTAINER
     return $?
 }
 
 is_container_exists() {
-    docker ps -a --format '{{.Names}}' | grep -wqs $CONTAINER
+    docker ps -a --format '{{.Names}}' | grep -xqs $CONTAINER
     return $?
 }
 
-get_current_http_port() {
-    DOCKER_HTTP_PORT=$(docker inspect $CONTAINER 2>/dev/null | jq -r '.[0].HostConfig.PortBindings."8081/tcp"[0].HostPort')
-    DOCKER_HTTP_IP=$(docker inspect $CONTAINER 2>/dev/null | jq -r '.[0].HostConfig.PortBindings."8081/tcp"[0].HostIp')
-    echo DEBUG: $CONTAINER, $DOCKER_HTTP_PORT, $DOCKER_HTTP_IP
-    if [ "$DOCKER_HTTP_PORT" != 'null' ]; then
-        if [ "$DOCKER_HTTP_IP" != 'null' ]; then
-            CURRENT_HTTP_PORT=$DOCKER_HTTP_IP:$DOCKER_HTTP_PORT
+get_current_live_port() {
+    PORTS=( $(docker inspect hamclock 2>/dev/null | jq -r '.[0].HostConfig.PortBindings."8081/tcp"[].HostPort' 2>/dev/null) )
+    IPS=( $(docker inspect hamclock 2>/dev/null | jq -r '.[0].HostConfig.PortBindings."8081/tcp"[].HostIp' 2>/dev/null) )
+    CURRENT_LIVE_PORT=
+    let i=0
+    while [ $i -lt ${#PORTS[@]} ]; do
+        if [ -z "$CURRENT_LIVE_PORT" ]; then
+            CURRENT_LIVE_PORT="${IPS[$i]}:${PORTS[$i]}"
         else
-            CURRENT_HTTP_PORT=:$DOCKER_HTTP_PORT
+            CURRENT_LIVE_PORT="${CURRENT_LIVE_PORT}|${IPS[$i]}:${PORTS[$i]}"
         fi
-    fi
+        i=$(($i+1))
+    done
 }
 
 get_current_image_tag() {
@@ -497,77 +511,88 @@ get_current_image_tag() {
     fi
 }
 
-get_current_pskr_image_tag() {
-    CURRENT_PSKR_DOCKER_IMAGE=$(docker inspect pskr-mqtt-cache 2>/dev/null | jq -r '.[0].Config.Image')
-    if [ "$CURRENT_PSKR_DOCKER_IMAGE" != 'null' ]; then
-        CURRENT_PSKR_TAG=${CURRENT_PSKR_DOCKER_IMAGE#*:}
-        CURRENT_PSKR_IMAGE_BASE=${CURRENT_PSKR_DOCKER_IMAGE%:*}
-    fi
-}
-
-get_current_voacap_image_tag() {
-    CURRENT_VOACAP_DOCKER_IMAGE=$(docker inspect voacap-service 2>/dev/null | jq -r '.[0].Config.Image')
-    if [ "$CURRENT_VOACAP_DOCKER_IMAGE" != 'null' ]; then
-        CURRENT_VOACAP_TAG=${CURRENT_VOACAP_DOCKER_IMAGE#*:}
-        CURRENT_VOACAP_IMAGE_BASE=${CURRENT_VOACAP_DOCKER_IMAGE%:*}
-    fi
-}
-
-determine_http_port() {
-    get_current_http_port
+determine_live_port() {
+    get_current_live_port
 
     # first precedence
-    if [ -n "$REQUESTED_HTTP_PORT" ]; then
-        HTTP_PORT=$REQUESTED_HTTP_PORT
+    if [ -n "$REQUESTED_LIVE_PORT" ]; then
+        LIVE_PORT=$REQUESTED_LIVE_PORT
 
     # second precedence
-    elif [ -n "$CURRENT_HTTP_PORT" -a "$CURRENT_HTTP_PORT" != ':' ]; then
-        HTTP_PORT=$CURRENT_HTTP_PORT
+    elif [ -n "$CURRENT_LIVE_PORT" -a "$CURRENT_LIVE_PORT" != ':' ]; then
+        LIVE_PORT=$CURRENT_LIVE_PORT
 
     # third precedence
-    elif [ -n "$STICKY_HTTP_PORT" ]; then
-        HTTP_PORT=$STICKY_HTTP_PORT
+    elif [ -n "$STICKY_LIVE_PORT" ]; then
+        LIVE_PORT=$STICKY_LIVE_PORT
 
     # fourth precedence
     else
-        HTTP_PORT=$DEFAULT_HTTP_PORT
+        LIVE_PORT=$DEFAULT_LIVE_PORT
 
     fi
 
-    # if there was a :, it was probably IP:PORT; otherwise make sure there's a colon for port only
-    [[ $HTTP_PORT =~ : ]] || HTTP_PORT=":$HTTP_PORT"
+    if [ "$LIVE_PORT" == "-" ]; then
+        LIVE_PORT_MAPPING=""
+    else
+		IFS='|' read -ra LIVE_PORT_ARRAY <<< "$LIVE_PORT"
+
+        LIVE_PORT_MAPPING=""
+		for p in "${LIVE_PORT_ARRAY[@]}"; do
+            # if there was a :, it was probably IP:PORT; otherwise make sure there's a colon for port only
+            [[ $p =~ : ]] || p=":$p"
+  			LIVE_PORT_MAPPING+="      - \"${p}:8081\""$'\n'
+		done
+    fi
 }
 
-determine_http_log() {
-
+determine_eeprom_file() {
     # first precedence
-    if [ -n "$REQUESTED_EXTERNAL_HTTP_LOG" ]; then
-        ENABLE_EXTERNAL_HTTP_LOG=$REQUESTED_EXTERNAL_HTTP_LOG
+    if [ -n "$REQUESTED_HC_EEPROM" ]; then
+        HC_EEPROM=$REQUESTED_HC_EEPROM
 
     # second precedence
-    elif [ -n "$STICKY_EXTERNAL_HTTP_LOG" ]; then
-        ENABLE_EXTERNAL_HTTP_LOG=$STICKY_EXTERNAL_HTTP_LOG
+    elif [ -n "$STICKY_HC_EEPROM" ]; then
+        HC_EEPROM=$STICKY_HC_EEPROM
 
     # third precedence
     else
-        ENABLE_EXTERNAL_HTTP_LOG=$DEFAULT_EXTERNAL_HTTP_LOG
+        HC_EEPROM=$DEFAULT_HC_EEPROM
 
     fi
 
-    if [ "$ENABLE_EXTERNAL_HTTP_LOG" == true ]; then
-        EXTERNAL_HTTP_LOG_MAPPING="- $HERE/logs/lighttpd:/var/log/lighttpd:rw"
-        if [ "${FUNCNAME[2]}" == "docker_compose_up" ]; then
-            if [ ! -e "$HERE/logs/lighttpd" ]; then
-                mkdir -p "$HERE/logs/lighttpd"
-            fi
-            if [ "$(stat -c '%u' "$HERE/logs/lighttpd" 2>/dev/null)" != "33" ]; then
-                # perms need to be set for logrotate to work
-                echo
-                echo "WARNING: folder '$HERE/logs/lighttpd' needs the following permission:"
-                echo "   sudo chown 33 $HERE/logs/lighttpd"
-                echo
-            fi
+    HC_EEPROM="$(realpath -s "$(dirname "$HC_EEPROM")" 2>/dev/null)/$(basename "$HC_EEPROM")"
+    # if the eeprom file doesn't exist, create it for proper mounting and use defaults if
+    # they exist.
+    if [ ! -e "$HC_EEPROM" ]; then
+        touch "$HC_EEPROM"
+        INITIAL_CONFIG_FILE="--env-file $HERE/config.env"
+    fi
+}
+
+determine_backend_host() {
+
+    # first precedence
+    if [ -n "$REQUESTED_BACKEND_HOST" ]; then
+        BACKEND_HOST=$REQUESTED_BACKEND_HOST
+
+    # second precedence
+    elif [ -n "$STICKY_BACKEND_HOST" ]; then
+        BACKEND_HOST=$STICKY_BACKEND_HOST
+
+    # third precedence
+    else
+        BACKEND_HOST=$DEFAULT_BACKEND_HOST
+
+    fi
+
+    if [ "$BACKEND_HOST" == "-" ]; then
+        DC_BACKEND_HOST=""
+    else
+        if [[ ! "$BACKEND_HOST" =~ : ]]; then
+            BACKEND_HOST="$BACKEND_HOST:80"
         fi
+        DC_BACKEND_HOST="- BACKEND_HOST=$BACKEND_HOST"
     fi
 }
 
@@ -610,8 +635,9 @@ determine_tag() {
 }
 
 docker_compose_yml() {
-    determine_http_port
-    determine_http_log
+    determine_live_port
+    determine_backend_host
+    determine_eeprom_file
 
     determine_tag || return $?
     IMAGE=$IMAGE_BASE:$TAG
@@ -623,36 +649,30 @@ docker_compose_yml() {
 
     # compose file in $DOCKER_COMPOSE_YML
     IFS= DOCKER_COMPOSE_YML=$(
-        docker_compose_yml_tmpl | 
-            sed "s/__DOCKER_PROJECT__/$DOCKER_PROJECT/" |
-            sed "s|__IMAGE__|$IMAGE|" |
-            sed "s/__CONTAINER__/$CONTAINER/" |
-            sed "s/__HTTP_PORT__/$HTTP_PORT/" |
-            sed "s|__EXTERNAL_HTTP_LOG_MAPPING__|$EXTERNAL_HTTP_LOG_MAPPING|" |
+        docker_compose_yml_tmpl
     )
 }
 
 docker_compose_yml_tmpl() {
     cat<<EOF
-name: __DOCKER_PROJECT__
+name: $DOCKER_PROJECT
 services:
   web:
-    env_file: config.env
     environment:
       - UTC_OFFSET=0
-      - BACKEND_HOST=ohb.hamclock.app:80
-    container_name: __CONTAINER__
-    image: __IMAGE__
+      $DC_BACKEND_HOST
+    container_name: $CONTAINER
+    image: $IMAGE
     restart: unless-stopped
     networks:
       - hamclock
     ports:
-      - "192.168.1.1:8080-8082:8080-8082"
-      - "[2600:1700:3ec0:83d8::1]:8080-8082:8080-8082"
-      - __HTTP_PORT__:8080-8082
+$LIVE_PORT_MAPPING
+$API_PORT_MAPPING
+$RO_PORT_MAPPING
     volumes:
       - type: bind
-        source: ./eeprom
+        source: $HC_EEPROM
         target: /root/.hamclock/eeprom
         bind:
           selinux: Z
