@@ -1,4 +1,4 @@
-## Hamclock from Clear Sky Institute in Docker
+## HamClock Live Web from Clear Sky Institute - Docker
 
 This repo contains the source code for Clear Sky Institute's HamClock v4.22. It also includes the hamclock-contrib zip-file contents.
 
