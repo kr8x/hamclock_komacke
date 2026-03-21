@@ -24,6 +24,7 @@ DEFAULT_BACKEND_HOST=-
 DEFAULT_HC_SIZE=-
 # the following env is the lighttpd env file
 DEFAULT_HC_EEPROM=hc.settings
+HC_USER=1199
 
 # the following env is for sticky settings
 STICKY_ENV_FILE=$DOCKER_PROJECT.env
@@ -413,7 +414,7 @@ docker_compose_up() {
         docker_compose_yml && docker compose -f <(echo "$DOCKER_COMPOSE_YML") create
         RETVAL=$?
         [ $RETVAL -ne 0 ] && return $RETVAL
-        docker compose $INITIAL_CONFIG_FILE -f <(echo "$DOCKER_COMPOSE_YML") up -d
+        docker compose -f <(echo "$DOCKER_COMPOSE_YML") up -d
         RETVAL=$?
     fi
 
@@ -687,9 +688,47 @@ determine_eeprom_file() {
     if [ ! -e "$HC_EEPROM" ]; then
         touch "$HC_EEPROM"
         if [ -r "$HERE/config.env" ]; then
-            INITIAL_CONFIG_FILE="--env-file $HERE/config.env"
+            INITIAL_CONFIG_FILE="env_file:
+      - $HERE/config.env"
         fi
     fi
+
+    hc_settings_perms
+}
+
+hc_settings_perms() {
+    # hc.settings needs to be writable by user 1199:1199
+    HC_PERMS=$(stat -c '%a' "$HC_EEPROM")
+    # who owns it
+    HC_OWN=$(stat -c '%u' "$HC_EEPROM")
+    HC_GRP=$(stat -c '%g' "$HC_EEPROM")
+
+    CAN_ACCESS=false
+    # test for u+rw
+    if [[ "$HC_OWN" == "$HC_USER" && "$HC_PERMS" == [67]?? ]]; then
+        CAN_ACCESS=true
+
+    # test for g+rw
+    elif [[ "$HC_GRP" == "$HC_USER" && "$HC_PERMS" == ?[67]? ]]; then
+        CAN_ACCESS=true
+    elif [[ "$HC_PERMS" == ??[67] ]]; then
+        CAN_ACCESS=true
+    else
+        chmod o+rw $HC_EEPROM >/dev/null 2>&1
+        PERM_RETVAL=$?
+        if [ $PERM_RETVAL -ne 0 ]; then
+            echo
+            echo "ERROR: $HC_EEPROM needs to be read/write by user $HC_USER:$HC_USER"
+            echo
+            echo "Try something like this:"
+            echo "    sudo chown $HC_USER:$HC_USER $HC_EEPROM"
+            echo "or"
+            echo "    sudo chmod o+rw $HC_EEPROM"
+            echo
+            exit 1
+        fi
+    fi
+
 }
 
 determine_backend_host() {
@@ -808,6 +847,7 @@ services:
       - UTC_OFFSET=0
       $DC_BACKEND_HOST
       $DC_HC_SIZE
+    $INITIAL_CONFIG_FILE
     container_name: $CONTAINER
     image: $IMAGE
     restart: unless-stopped
@@ -817,7 +857,7 @@ services:
     volumes:
       - type: bind
         source: $HC_EEPROM
-        target: /root/.hamclock/eeprom
+        target: /opt/.hamclock/eeprom
         bind:
           selinux: Z
     healthcheck:
