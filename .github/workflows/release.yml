@@ -50,7 +50,7 @@ jobs:
           gh release create ${{ github.event.inputs.tag_name }} \
             "./docker/manage-hc-docker-${{ github.event.inputs.tag_name }}.sh#Manage HamClock Docker Installs" \
             "dist/ESPHamClock.zip#HamClock Source Zip" \
-            "dist/ESPHamClock-V${{ github.event.inputs.tag_name }}.zip#HamClock Source Zip" \
+            "dist/ESPHamClock-V${{ github.event.inputs.tag_name }}.zip#HamClock Source Zip with version" \
             "dist/hamclock-contrib.zip#HamClock 3rd party contributions" \
             --title "HamClock Release: ${{ github.event.inputs.tag_name }}" \
             --generate-notes
