@@ -2258,7 +2258,7 @@ bool postDiags (void)
         int buf_l = 0;
 
         // hand-crafted POST header, move to its own func if ever used for something else
-        buf_l += snprintf (buf+buf_l, sizeof(buf)-buf_l, "POST %s HTTP\r\n", fn);
+        buf_l += snprintf (buf+buf_l, sizeof(buf)-buf_l, "POST %s HTTP/1.0\r\n", fn);
         buf_l += snprintf (buf+buf_l, sizeof(buf)-buf_l, "Content-Length: %d\r\n", cl);
         pd_client.print (buf);
         sendUserAgent (pd_client);
