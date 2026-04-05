@@ -288,9 +288,15 @@ static bool retrievePSK (void)
             DXSpot new_sp = {};
             long posting_temp;
             long Hz_temp;
-            if (sscanf (line, "%ld,%6[^,],%11[^,],%6[^,],%11[^,],%7[^,],%ld,%f", &posting_temp,
-                            new_sp.tx_grid, new_sp.tx_call, new_sp.rx_grid, new_sp.rx_call,
-                            new_sp.mode, &Hz_temp, &new_sp.snr) != 8) {
+            if (sscanf (line, "%ld,%6[^,],%11[^,]%*[^,],%6[^,],%11[^,]%*[^,],%7[^,],%ld,%f",
+                            &posting_temp,
+                            new_sp.tx_grid,
+                            new_sp.tx_call,
+                            new_sp.rx_grid,
+                            new_sp.rx_call,
+                            new_sp.mode,
+                            &Hz_temp,
+                            &new_sp.snr) != 8) {
                 Serial.printf ("PSK: %s\n", line);
                 goto out;
             }
