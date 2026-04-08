@@ -17,9 +17,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+            ref: ${{ github.ref }}
 
       - name: Prepare assets
         run: |
+          echo "Running on branch: ${{ github.ref_name }}"
+
           # Define asset names with the tag
           TAG="${{ github.event.inputs.tag_name }}"
 
@@ -27,7 +31,6 @@ jobs:
           HC_TAG=${HC_TAG#v}
           HC_TAG=${HC_TAG#V}
 
-          REF="${{ github.ref_name }}"
           MGR_NAME="manage-hc-docker-$TAG.sh"
 
           # create a manager with version in the name and file
