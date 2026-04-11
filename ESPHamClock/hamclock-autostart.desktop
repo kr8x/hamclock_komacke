@@ -15,8 +15,8 @@ Name=HamClock
 GenericName=Amateur Radio Clock
 Comment=Scientific clock for amateur radio operators
 # This shell command waits for a graphical display (X11 or Wayland) 
-# then waits 3 seconds for the window manager to settle before launching.
-Exec=sh -c 'until [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; do sleep 1; done; sleep 3; exec /usr/local/bin/hamclock'
+# then waits 5 seconds for the window manager to settle before launching.
+Exec=sh -c 'until [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; do sleep 1; done; sleep 5; exec /usr/local/bin/hamclock'
 Icon=hamclock
 Terminal=false
 Type=Application
@@ -27,7 +27,7 @@ Categories=HamRadio
 
 # For GNOME (Fedora/Debian default):
 X-GNOME-Autostart-enabled=true
-X-GNOME-Autostart-Delay=3
+X-GNOME-Autostart-Delay=5
 
 # For KDE (Fedora/Debian KDE spins):
 # Tells KDE to wait until the panel/taskbar is loaded
