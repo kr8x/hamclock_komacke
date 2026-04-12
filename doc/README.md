@@ -9,6 +9,7 @@
 
 ## References
 
-* <https://ohb.works/> - home of the successor project, Open Hamclock Backend
+* <https://ohb.works/> - Open Hamclock Backend
+* <https://hamclock.com> - hamclock.com backend
 * <https://clearskyinstitute.com/ham/HamClock/> - the original home
 * <https://web.archive.org/web/20260123074655/https://www.clearskyinstitute.com/ham/HamClock/> a good archive.org entry point into the history of HamClock website
