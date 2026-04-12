@@ -108,27 +108,27 @@ uint32_t millis(void)
     #if defined(CLOCK_MONOTONIC_FAST_XXXX)
         // this is only on FreeBSD but is fully 200x faster than gettimeofday or CLOCK_MONOTONIC
         // as of 14-RELEASE now this one is slow -- use normal gettimeofday
-	static struct timespec t0;
-	struct timespec t;
-	clock_gettime (CLOCK_MONOTONIC_FAST, &t);
-	if (t0.tv_sec == 0)
-	    t0 = t;
-	uint32_t dt_ms = (t.tv_sec - t0.tv_sec)*1000 + (t.tv_nsec - t0.tv_nsec)/1000000;
-	return (dt_ms);
+    static struct timespec t0;
+    struct timespec t;
+    clock_gettime (CLOCK_MONOTONIC_FAST, &t);
+    if (t0.tv_sec == 0)
+        t0 = t;
+    uint32_t dt_ms = (t.tv_sec - t0.tv_sec)*1000 + (t.tv_nsec - t0.tv_nsec)/1000000;
+    return (dt_ms);
     #else
-	static struct timeval t0;
-	struct timeval t;
-	gettimeofday (&t, NULL);
-	if (t0.tv_sec == 0)
-	    t0 = t;
-	uint32_t dt_ms = (t.tv_sec - t0.tv_sec)*1000 + (t.tv_usec - t0.tv_usec)/1000;
-	return (dt_ms);
+    static struct timeval t0;
+    struct timeval t;
+    gettimeofday (&t, NULL);
+    if (t0.tv_sec == 0)
+        t0 = t;
+    uint32_t dt_ms = (t.tv_sec - t0.tv_sec)*1000 + (t.tv_usec - t0.tv_usec)/1000;
+    return (dt_ms);
     #endif
 }
 
 void delay (uint32_t ms)
 {
-	usleep (ms*1000);
+    usleep (ms*1000);
 }
 
 long random(int max)
@@ -145,7 +145,7 @@ uint16_t analogRead(int pin)
 {
         (void) pin;
 
-	return (0);		// not supported on Pi, consider https://www.adafruit.com/product/1083
+    return (0);     // not supported on Pi, consider https://www.adafruit.com/product/1083
 }
 
 static void mvLog (const char *from, const char *to)
@@ -405,7 +405,7 @@ static void usage (const char *errfmt, ...)
             fprintf (stderr, " -r p : set read-only live web server port to p or -1 to disable; default %d\n",
                                     LIVEWEB_RO_PORT);
             fprintf (stderr, " -s d : start time as if UTC now is d formatted as YYYY-MM-DDTHH:MM:SS\n");
-			fprintf (stderr, " -S s : set Software server host for OTA download; default is %s\nMust come after -b if used\n",software_host);
+            fprintf (stderr, " -S s : set Software server host for OTA download; default is %s\nMust come after -b if used\n",software_host);
             fprintf (stderr, " -t p : throttle max cpu to p percent; default is %.0f\n", DEF_CPU_USAGE*100);
             fprintf (stderr, " -T t : set max timeout for responses from backend\n");
             fprintf (stderr, " -v   : show version info then exit\n");
@@ -444,37 +444,37 @@ static void crackArgs (int ac, char *av[])
         int max_lw = 0;
 // process build variables before processing command options that override them
     #if defined(_T)
-		{
-			char *myt = strdup(TOSTRING(_T));
-			uint8_t to = atoi(myt);
-			if (to < 1  || to > 65)
-				usage ("build error, T=timout, timeout must be [1,65] seconds");
-			set_timeout_s(to);
-		}
+        {
+            char *myt = strdup(TOSTRING(_T));
+            uint8_t to = atoi(myt);
+            if (to < 1  || to > 65)
+                usage ("build error, T=timout, timeout must be [1,65] seconds");
+            set_timeout_s(to);
+        }
     #endif
 // Process B first since it modifies backend_host and software_host for backward compatibility to -b arg
     #if defined(_B)
-		{
-			 char *myb = strdup(TOSTRING(_B));
+        {
+             char *myb = strdup(TOSTRING(_B));
              char *myb_colon = strchr (myb, ':');
              if (myb_colon) {
                 *myb_colon = '\0';                  // put EOS after host
                 backend_host = myb;
-				software_host = myb;
+                software_host = myb;
                 backend_port = atoi(myb_colon+1);
                 if (backend_port < 1 || backend_port > 65535)
                    usage ("build error, B=host:port, port must be [1,65355]");
-			 } else {
-		        usage ("build error, B=host:port, : missing");
-			 }
-		}
+             } else {
+                usage ("build error, B=host:port, : missing");
+             }
+        }
     #endif
     #if defined(_S)
-	    {
+        {
             char *myb = strdup(TOSTRING(_S));
-	    software_host = myb;
+        software_host = myb;
             version_https=true;
-	    }
+        }
     #endif
         while (--ac && **++av == '-') {
             char *s = *av;
@@ -507,7 +507,7 @@ static void crackArgs (int ac, char *av[])
                         if (myb_colon) {
                             *myb_colon = '\0';                  // put EOS after host
                             backend_host = myb;
-			    software_host = myb;
+                software_host = myb;
                             backend_port = atoi(myb_colon+1);
                             if (backend_port < 1 || backend_port > 65535)
                                 usage ("-b port must be [1,65355]");
@@ -706,7 +706,7 @@ static void crackArgs (int ac, char *av[])
 int main (int ac, char *av[])
 {
         // save our args for restart or remote update
-	our_argv = av;
+    our_argv = av;
 
         // always want stdout immediate and allow for multiple processes writing
         fcntl (1, F_SETFL, fcntl (1, F_GETFL, 0) | O_APPEND);
@@ -729,11 +729,11 @@ int main (int ac, char *av[])
         // log os release, if available
         logOS();
 
-	// call Arduino setup one time
+    // call Arduino setup one time
         printf ("Calling Arduino setup()\n");
-	setup();
+    setup();
 
-	// call Arduino loop forever
+    // call Arduino loop forever
         // this loop by itself would run 100% CPU so offer a means to be a better citizen and throttle back
         printf ("Starting Arduino loop()\n");
 

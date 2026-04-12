@@ -111,7 +111,7 @@ OBJS = \
 	earthsat.o \
 	emetool.o \
 	favicon.o \
-        fsfree.o \
+	fsfree.o \
 	gimbal.o \
 	gpsd.o \
 	grayline.o \
@@ -296,15 +296,15 @@ install:
 	DIR=/usr/local/bin ; \
 	TARGET=$$DIR/hamclock ; \
 	if ! [ -x $$SOURCE ] ; then \
-	    echo 'make something first' ; \
-	    make help ; \
+		echo 'make something first' ; \
+		make help ; \
 	elif [ `id -un` != 'root' ] ; then \
-	    echo please run with sudo ; \
+		echo please run with sudo ; \
 	else \
-	    mkdir -p $$DIR \
-	    && mv -f $$SOURCE $$TARGET \
-	    && chown root $$TARGET \
-	    && chmod u+s $$TARGET; \
+		mkdir -p $$DIR \
+		&& mv -f $$SOURCE $$TARGET \
+		&& chown root $$TARGET \
+		&& chmod u+s $$TARGET; \
 	fi
 
 clean clobber:

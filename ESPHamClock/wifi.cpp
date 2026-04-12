@@ -399,7 +399,8 @@ static void initWiFi (bool verbose)
         ip = WiFi.dnsIP();
         tftMsg (verbose, 0, "DNS: %d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
         tftMsg (verbose, 0, "BE: %s:%d", backend_host, backend_port);
-        tftMsg (verbose, 0, "SE: %s", software_host);
+        if (strcmp(backend_host,software_host) != 0)
+            tftMsg (verbose, 0, "SE: %s", software_host);
         int rssi;
         bool is_dbm;
         if (readWiFiRSSI(rssi,is_dbm)) {
@@ -1429,15 +1430,15 @@ void httpHCGET (WiFiClient &client, const char *server, const char *hc_page)
 
 bool connecthttpsHCGET (WiFiClient &client, const char *server, const char *hc_page)
 {
-	static const char c1[] = "curl -A \"";  //then platform
-   	static const char c2[] = "/";                    //then hc_version
-	static const char c3[] = "\" --max-time 15 --silent --retry 2 https://"; //then server
+    static const char c1[] = "curl -A \"";  //then platform
+    static const char c2[] = "/";                    //then hc_version
+    static const char c3[] = "\" --max-time 15 --silent --retry 2 https://"; //then server
     static const char hc[] = "/ham/HamClock";        // then hc_page
-	int memlen = strlen(c1)+strlen(platform)+strlen(c2)+strlen(hc_version)+strlen(c3)+strlen(server)+strlen(hc)+strlen(hc_page)+1;
-	StackMalloc curlbuf(memlen);
-	char *curl = (char *) curlbuf.getMem();
-	snprintf (curl, memlen, "%s%s%s%s%s%s%s%s",c1,platform,c2,hc_version,c3,server,hc, hc_page);
-	printf("wifi: connecting to command %s\n",curl);
+    int memlen = strlen(c1)+strlen(platform)+strlen(c2)+strlen(hc_version)+strlen(c3)+strlen(server)+strlen(hc)+strlen(hc_page)+1;
+    StackMalloc curlbuf(memlen);
+    char *curl = (char *) curlbuf.getMem();
+    snprintf (curl, memlen, "%s%s%s%s%s%s%s%s",c1,platform,c2,hc_version,c3,server,hc, hc_page);
+    printf("wifi: connecting to command %s\n",curl);
     return (client.connectCommand(curl));
 }
 /* skip the given wifi client stream ahead to just after the first blank line, return whether ok.
