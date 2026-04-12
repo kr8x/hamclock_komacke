@@ -26,8 +26,8 @@ bool ignore_x11geom;            // set by -q to ignore startup loc and size
 #if defined(_VERSION_HTTPS)
   bool version_https=true;
 #else
-  bool version_https=false;             // forces https to be used for fetching version	
-#endif 
+  bool version_https=false;             // forces https to be used for fetching version
+#endif
 // list of diagnostic files, newest first
 const char *diag_files[N_DIAG_FILES] = {
     "diagnostic-log.txt",
@@ -40,7 +40,7 @@ const char *diag_files[N_DIAG_FILES] = {
 #define TOSTRING(x)  STRINGIFY(x)
 // how we were made
 char build_variables[128];
-char build_B[128];				  
+char build_B[128];
 
 #if defined(_USE_FB0)
   #if defined(_CLOCK_1600x960)
@@ -75,7 +75,7 @@ char build_B[128];
 #else
   #error Unknown build configuration
 #endif
- 
+
 
 // public for user agent
 const char *pw_file;
@@ -89,7 +89,7 @@ static void initBuildVariables(void)
     #endif
     #if defined(_T)
         snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "T=%d ", _T);
-    #endif				   			   
+    #endif
     #if defined(_B)
         snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "B=%s ", TOSTRING(_B));
     #endif
@@ -413,7 +413,7 @@ static void usage (const char *errfmt, ...)
             fprintf (stderr, " -s d : start time as if UTC now is d formatted as YYYY-MM-DDTHH:MM:SS\n");
 			fprintf (stderr, " -S s : set Software server host for OTA download; default is %s\nMust come after -b if used\n",software_host);
             fprintf (stderr, " -t p : throttle max cpu to p percent; default is %.0f\n", DEF_CPU_USAGE*100);
-            fprintf (stderr, " -T t : set max timeout for responses from backend\n");			
+            fprintf (stderr, " -T t : set max timeout for responses from backend\n");
             fprintf (stderr, " -v   : show version info then exit\n");
             fprintf (stderr, " -w p : set read-write live web server port to p or -1 to disable; default %d\n",
                                     LIVEWEB_RW_PORT);
@@ -453,7 +453,7 @@ static void crackArgs (int ac, char *av[])
 		{
 			char *myt = strdup(TOSTRING(_T));
 			uint8_t to = atoi(myt);
-			if (to < 1  || to > 65)	
+			if (to < 1  || to > 65)
 				usage ("build error, T=timout, timeout must be [1,65] seconds");
 			set_timeout_s(to);
 		}
@@ -461,7 +461,7 @@ static void crackArgs (int ac, char *av[])
 // Process B first since it modifies backend_host and software_host for backward compatibility to -b arg
     #if defined(_B)
 		{
-			 char *myb = strdup(TOSTRING(_B));      		 
+			 char *myb = strdup(TOSTRING(_B));
              char *myb_colon = strchr (myb, ':');
              if (myb_colon) {
                 *myb_colon = '\0';                  // put EOS after host
@@ -479,8 +479,8 @@ static void crackArgs (int ac, char *av[])
 	    {
             char *myb = strdup(TOSTRING(_S));
 			software_host = myb;
-	    }		
-    #endif		  
+	    }
+    #endif
         while (--ac && **++av == '-') {
             char *s = *av;
             while (*++s) {

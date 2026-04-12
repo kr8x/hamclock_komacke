@@ -76,7 +76,7 @@ class WiFiClient {
         bool pending(int ms);
         void logBuffer (const uint8_t *buf, int nbuf);
 	bool m_isPipe;
-    FILE* m_pipe;	
+    FILE* m_pipe;
 
 };
 

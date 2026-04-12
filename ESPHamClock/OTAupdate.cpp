@@ -63,7 +63,7 @@ bool newVersionIsAvailable (char *new_ver, uint16_t new_verl)
     Serial.printf ("%s/%s\n", software_host, v_page);
  if (version_https) {
 	 Serial.printf ("via https\n");
- }	 
+ }
  else {
 	 Serial.printf ("via port %d\n",backend_port);
  }
@@ -74,17 +74,17 @@ bool newVersionIsAvailable (char *new_ver, uint16_t new_verl)
 	else {
 		connected = v_client.connect (backend_host, backend_port);
 	}
-		
+
     if (connected) {
         if (version_https == false) {
 			// query page
             httpHCGET (v_client, backend_host, v_page);
 
-					  
+
 			if (!httpSkipHeader (v_client)) {
 				Serial.println ("Version query header is short");
 				goto out;
-			}			
+			}
 		}
 
         // next line is new version number
@@ -206,7 +206,7 @@ bool askOTAupdate(char *new_ver, bool show_pending, bool def_yes)
 	else {
 		connected = v_client.connect (backend_host, backend_port);
 	}
-		
+
     if (connected) {
         if (version_https == false) {
 			// query page
@@ -214,7 +214,7 @@ bool askOTAupdate(char *new_ver, bool show_pending, bool def_yes)
 			if (!httpSkipHeader (v_client)) {
 				Serial.println ("Version query header is short");
 				goto out;
-			}			
+			}
 		}
 
         // skip next line which is new version number
@@ -242,7 +242,7 @@ bool askOTAupdate(char *new_ver, bool show_pending, bool def_yes)
     drawChangeList (lines, 0, n_lines);
 
     // scrollbar
-    SBox sb_b = {SCR_X, SCR_Y, SCR_W, SCR_H}; 
+    SBox sb_b = {SCR_X, SCR_Y, SCR_W, SCR_H};
     ScrollBar sb;
     sb.init (max_lines, n_lines, sb_b);
 

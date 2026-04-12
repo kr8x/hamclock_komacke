@@ -15,7 +15,7 @@ WiFiClient::WiFiClient()
         next_peek = 0;
 		read_pending_ms = get_timeout_ms();
 	m_isPipe = false;
-    m_pipe = nullptr;						  
+    m_pipe = nullptr;
 }
 
 // constructor handed an open socket to use
@@ -29,7 +29,7 @@ WiFiClient::WiFiClient(int fd)
 	n_peek = 0;
         next_peek = 0;
 	m_isPipe = false;
-    m_pipe = nullptr;	
+    m_pipe = nullptr;
 }
 
 // return whether this socket is active
@@ -217,7 +217,7 @@ void WiFiClient::stop()
 	} else if (debugLevel (DEBUG_NET, 2))
             printf ("WiFiCl: fd %d already stopped\n", socket);
 	n_peek = 0;
-    next_peek = 0;		  
+    next_peek = 0;
 }
 
 bool WiFiClient::connected()
