@@ -135,7 +135,7 @@ poke_version_cpp() {
         HC_TAG=${GIT_VERSION%.*}
         HC_TAG=${HC_TAG#v}
         HC_TAG=${HC_TAG#V}
-        sed -i 's/\(hc_version = "\)[0-9.]\+/\1'$HC_TAG'/' ESPHamClock/version.cpp
+        sed -i 's/\(hc_version = "\)[^"]\+\(".*\)/\1'$HC_TAG'\2/' ESPHamClock/version.cpp
     fi
 }
 
