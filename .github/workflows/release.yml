@@ -45,7 +45,7 @@ jobs:
           echo "TAG=$TAG" > VERSION.txt
 
           # update version in HC source
-          sed -i 's/\(hc_version = "\)[0-9.]\+/\1'$HC_TAG'/' ESPHamClock/version.cpp
+          sed -i 's/\(hc_version = "\)[^"]\+\(".*\)/\1'$HC_TAG'\2/' ESPHamClock/version.cpp
 
           # create the tars and zips
           mkdir dist
