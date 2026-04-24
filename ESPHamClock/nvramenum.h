@@ -1,4 +1,4 @@
-#ifndef _NVRAMENUM_H
+j#ifndef _NVRAMENUM_H
 #define _NVRAMENUM_H
 
 
@@ -346,21 +346,17 @@ typedef enum {
 
     // 240
     NV_SAT2FLAGS,               // satellite 2 options
-	NV_ANT_DE_INDEX,            // Antenna index for TX
-	NV_ANT_DX_INDEX,            // Antenna index for RX
-	NV_ANT_DEDX_CONTROL,        // Antenna selection b0 DE b1 DX
-	NV_ANT_DE_AZ,               // Antenna Azimuth for DE
-	
-	// 245
-	NV_ANT_DX_AZ,               // Antenna Azimuth for DX
-	NV_ANT_DE_INDEX,            // Antenna index for TX
-	NV_ANT_DX_INDEX,            // Antenna index for RX
-	NV_ANT_DEDX_CONTROL,        // Antenna selection b0 DE b1 DX
-	NV_ANT_DE_AZ,               // Antenna Azimuth for DE
 
 	// 245
+	NV_ANT_DE_INDEX,            // Antenna index for TX
+	NV_ANT_DX_INDEX,            // Antenna index for RX
+	NV_ANT_DEDX_CONTROL,        // Antenna selection b0 DE b1 DX
+	NV_ANT_DE_AZ,               // Antenna Azimuth for DE
 	NV_ANT_DX_AZ,               // Antenna Azimuth for DX
-	
+
+    // 246
+    NV_LIGHTNING_ON,            // whether to show lightning strikes overlay
+
 	NV_N
 
 } NV_Name;
