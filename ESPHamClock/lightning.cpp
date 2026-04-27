@@ -230,43 +230,46 @@ void drawNCDXFLightningStats (void)
     // Erase panel
     fillSBox (NCDXF_b, RA8875_BLACK);
 
-    // Header
-    selectFontStyle (LIGHT_FONT, FAST_FONT);
-    tft.setTextColor (RGB565(255, 220, 0));
-    const char *hdr = "Lightning";
-    uint16_t hw = getTextWidth (hdr);
-    tft.setCursor (NCDXF_b.x + (NCDXF_b.w - hw)/2, NCDXF_b.y + 6);
-    tft.print (hdr);
+    // Count by age band
+    int fresh = 0, recent = 0, old = 0;
+    for (int i = 0; i < n_strikes; i++) {
+        if      (strikes[i].age_s < 120) fresh++;
+        else if (strikes[i].age_s < 300) recent++;
+        else                             old++;
+    }
 
-    // Large centred strike count
-    char buf[6];
-    int n = n_strikes < 9999 ? n_strikes : 9999;
-    char tmp[5]; int pos = 4; tmp[pos] = '\0';
-    if (n == 0) { tmp[--pos] = '0'; }
-    else { do { tmp[--pos] = '0' + (n % 10); n /= 10; } while (n > 0); }
-    strncpy (buf, tmp + pos, sizeof(buf) - 1); buf[sizeof(buf)-1] = '\0';
+    // Integer-to-string without snprintf — avoids -Wformat-truncation entirely.
+    // Writes decimal of n (0..9999) into dst[NCDXF_B_MAXLEN].
+    auto itoa4 = [](char *dst, int n) {
+        if (n > 9999) n = 9999;
+        if (n < 0)    n = 0;
+        char tmp[5]; int pos = 4; tmp[pos] = '\0';
+        do { tmp[--pos] = (char)('0' + n % 10); n /= 10; } while (n > 0);
+        strncpy (dst, tmp + pos, NCDXF_B_MAXLEN - 1);
+        dst[NCDXF_B_MAXLEN - 1] = '\0';
+    };
 
-    selectFontStyle (LIGHT_FONT, SMALL_FONT);
-    tft.setTextColor (n_strikes > 0 ? RGB565(255, 220, 0) : RA8875_WHITE);
-    uint16_t vw = getTextWidth (buf);
-    tft.setCursor (NCDXF_b.x + (NCDXF_b.w - vw)/2, NCDXF_b.y + NCDXF_b.h/2 - 4);
-    tft.print (buf);
+    char     titles[NCDXF_B_NFIELDS][NCDXF_B_MAXLEN];
+    char     values[NCDXF_B_NFIELDS][NCDXF_B_MAXLEN];
+    uint16_t colors[NCDXF_B_NFIELDS];
 
-    // Label below count
-    selectFontStyle (LIGHT_FONT, FAST_FONT);
-    tft.setTextColor (RA8875_WHITE);
-    const char *lbl = "Strikes";
-    uint16_t lw = getTextWidth (lbl);
-    tft.setCursor (NCDXF_b.x + (NCDXF_b.w - lw)/2, NCDXF_b.y + NCDXF_b.h/2 + 12);
-    tft.print (lbl);
+    strncpy (titles[0], "Strikes", NCDXF_B_MAXLEN-1); titles[0][NCDXF_B_MAXLEN-1] = '\0';
+    itoa4 (values[0], n_strikes);
+    colors[0] = RA8875_WHITE;
 
-    // Sub-label showing radius
-    selectFontStyle (LIGHT_FONT, FAST_FONT);
-    tft.setTextColor (RGB565(120, 120, 120));
-    const char *sub = "Worldwide";
-    uint16_t sw = getTextWidth (sub);
-    tft.setCursor (NCDXF_b.x + (NCDXF_b.w - sw)/2, NCDXF_b.y + NCDXF_b.h - 10);
-    tft.print (sub);
+    strncpy (titles[1], "< 2 min", NCDXF_B_MAXLEN-1); titles[1][NCDXF_B_MAXLEN-1] = '\0';
+    itoa4 (values[1], fresh);
+    colors[1] = RGB565(255, 220, 0);
+
+    strncpy (titles[2], "2-5 min", NCDXF_B_MAXLEN-1); titles[2][NCDXF_B_MAXLEN-1] = '\0';
+    itoa4 (values[2], recent);
+    colors[2] = RGB565(255, 140, 0);
+
+    strncpy (titles[3], "5-10min", NCDXF_B_MAXLEN-1); titles[3][NCDXF_B_MAXLEN-1] = '\0';
+    itoa4 (values[3], old);
+    colors[3] = RGB565(220, 40, 40);
+
+    drawNCDXFStats (RA8875_BLACK, titles, values, colors);
 }
 
 // ---- public API ----------------------------------------------------------
