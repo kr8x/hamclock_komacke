@@ -62,6 +62,16 @@ uint8_t lightning_on;   // extern; saved to NV_LIGHTNING_ON
 
 static void drawBolt (int16_t cx, int16_t cy, uint16_t color)
 {
+    // Guard: bolt extends 6px vertically and 4px horizontally from centre.
+    // Use raw map bounds to ensure every pixel lands on screen.
+    uint16_t mx = (uint16_t)(tft.SCALESZ * map_b.x);
+    uint16_t my = (uint16_t)(tft.SCALESZ * map_b.y);
+    uint16_t mw = (uint16_t)(tft.SCALESZ * map_b.w);
+    uint16_t mh = (uint16_t)(tft.SCALESZ * map_b.h);
+    if (cx-4 < (int16_t)mx || cx+4 >= (int16_t)(mx+mw) ||
+        cy-6 < (int16_t)my || cy+6 >= (int16_t)(my+mh))
+        return;
+
     tft.drawLineRaw (cx+2, cy-6,  cx-2, cy-1,  2, color);
     tft.drawLineRaw (cx-4, cy,    cx+4, cy,     2, color);
     tft.drawLineRaw (cx+2, cy+1,  cx-2, cy+6,  2, color);
@@ -183,10 +193,18 @@ static void drawLightningRings (void)
 
             if (s0.x) {
                 if (segmentSpanOkRaw (s0, s1, tft.SCALESZ)) {
-                    if (dot % 2 == 0)
-                        tft.drawLineRaw (s0.x, s0.y, s1.x, s1.y, 1, ring_color);
+                    if (dot % 2 == 0) {
+                        // guard both endpoints within raw map bounds before drawing
+                        uint16_t mx = tft.SCALESZ * map_b.x;
+                        uint16_t my = tft.SCALESZ * map_b.y;
+                        uint16_t mw = tft.SCALESZ * map_b.w;
+                        uint16_t mh = tft.SCALESZ * map_b.h;
+                        if (s0.x >= mx && s0.x < mx+mw && s0.y >= my && s0.y < my+mh &&
+                            s1.x >= mx && s1.x < mx+mw && s1.y >= my && s1.y < my+mh)
+                            tft.drawLineRaw (s0.x, s0.y, s1.x, s1.y, 1, ring_color);
+                    }
                 } else {
-                    s1.x = 0;   // reset on gap so next segment starts fresh
+                    s1.x = 0;
                 }
             }
 
@@ -212,67 +230,43 @@ void drawNCDXFLightningStats (void)
     // Erase panel
     fillSBox (NCDXF_b, RA8875_BLACK);
 
-    if (n_strikes == 0) {
-        // Single centred "0" — no need for snprintf, no compiler warnings
-        selectFontStyle (LIGHT_FONT, SMALL_FONT);
-        tft.setTextColor (RA8875_WHITE);
-        uint16_t vw = getTextWidth ("0");
-        tft.setCursor (NCDXF_b.x + (NCDXF_b.w - vw)/2,
-                       NCDXF_b.y + NCDXF_b.h/2 - 8);
-        tft.print ("0");
+    // Header
+    selectFontStyle (LIGHT_FONT, FAST_FONT);
+    tft.setTextColor (RGB565(255, 220, 0));
+    const char *hdr = "Lightning";
+    uint16_t hw = getTextWidth (hdr);
+    tft.setCursor (NCDXF_b.x + (NCDXF_b.w - hw)/2, NCDXF_b.y + 6);
+    tft.print (hdr);
 
-        selectFontStyle (LIGHT_FONT, FAST_FONT);
-        tft.setTextColor (RA8875_WHITE);
-        const char *lbl = "Strikes";
-        uint16_t lw = getTextWidth (lbl);
-        tft.setCursor (NCDXF_b.x + (NCDXF_b.w - lw)/2,
-                       NCDXF_b.y + NCDXF_b.h/2 + 6);
-        tft.print (lbl);
-        return;
-    }
+    // Large centred strike count
+    char buf[6];
+    int n = n_strikes < 9999 ? n_strikes : 9999;
+    char tmp[5]; int pos = 4; tmp[pos] = '\0';
+    if (n == 0) { tmp[--pos] = '0'; }
+    else { do { tmp[--pos] = '0' + (n % 10); n /= 10; } while (n > 0); }
+    strncpy (buf, tmp + pos, sizeof(buf) - 1); buf[sizeof(buf)-1] = '\0';
 
-    // Count by age band
-    int fresh = 0, recent = 0, old = 0;
-    for (int i = 0; i < n_strikes; i++) {
-        if      (strikes[i].age_s < 120) fresh++;
-        else if (strikes[i].age_s < 300) recent++;
-        else                             old++;
-    }
+    selectFontStyle (LIGHT_FONT, SMALL_FONT);
+    tft.setTextColor (n_strikes > 0 ? RGB565(255, 220, 0) : RA8875_WHITE);
+    uint16_t vw = getTextWidth (buf);
+    tft.setCursor (NCDXF_b.x + (NCDXF_b.w - vw)/2, NCDXF_b.y + NCDXF_b.h/2 - 4);
+    tft.print (buf);
 
-    // Build four rows using string literals for counts that fit known bounds.
-    // Use a lookup into a static string table rather than snprintf to avoid
-    // -Wformat-truncation entirely. Values are capped at 9999.
-    char     titles[NCDXF_B_NFIELDS][NCDXF_B_MAXLEN];
-    char     values[NCDXF_B_NFIELDS][NCDXF_B_MAXLEN];
-    uint16_t colors[NCDXF_B_NFIELDS];
+    // Label below count
+    selectFontStyle (LIGHT_FONT, FAST_FONT);
+    tft.setTextColor (RA8875_WHITE);
+    const char *lbl = "Strikes";
+    uint16_t lw = getTextWidth (lbl);
+    tft.setCursor (NCDXF_b.x + (NCDXF_b.w - lw)/2, NCDXF_b.y + NCDXF_b.h/2 + 12);
+    tft.print (lbl);
 
-    // itoa-style helper: write decimal of n (0..9999) into dst[NCDXF_B_MAXLEN]
-    auto fmt = [](char *dst, int n) {
-        n = n < 9999 ? n : 9999;
-        // build digits right-to-left into a small local then copy
-        char tmp[5]; int pos = 4; tmp[pos] = '\0';
-        do { tmp[--pos] = '0' + (n % 10); n /= 10; } while (n > 0);
-        strncpy (dst, tmp + pos, NCDXF_B_MAXLEN - 1);
-        dst[NCDXF_B_MAXLEN - 1] = '\0';
-    };
-
-    strncpy (titles[0], "Strikes", NCDXF_B_MAXLEN-1); titles[0][NCDXF_B_MAXLEN-1] = '\0';
-    fmt (values[0], n_strikes);
-    colors[0] = RA8875_WHITE;
-
-    strncpy (titles[1], "< 2 min", NCDXF_B_MAXLEN-1); titles[1][NCDXF_B_MAXLEN-1] = '\0';
-    fmt (values[1], fresh);
-    colors[1] = RGB565(255, 220, 0);
-
-    strncpy (titles[2], "2-5 min", NCDXF_B_MAXLEN-1); titles[2][NCDXF_B_MAXLEN-1] = '\0';
-    fmt (values[2], recent);
-    colors[2] = RGB565(255, 140, 0);
-
-    strncpy (titles[3], "5-10min", NCDXF_B_MAXLEN-1); titles[3][NCDXF_B_MAXLEN-1] = '\0';
-    fmt (values[3], old);
-    colors[3] = RGB565(220, 40, 40);
-
-    drawNCDXFStats (RA8875_BLACK, titles, values, colors);
+    // Sub-label showing radius
+    selectFontStyle (LIGHT_FONT, FAST_FONT);
+    tft.setTextColor (RGB565(120, 120, 120));
+    const char *sub = "Worldwide";
+    uint16_t sw = getTextWidth (sub);
+    tft.setCursor (NCDXF_b.x + (NCDXF_b.w - sw)/2, NCDXF_b.y + NCDXF_b.h - 10);
+    tft.print (sub);
 }
 
 // ---- public API ----------------------------------------------------------
@@ -349,7 +343,7 @@ void drawLightningOnMap (void)
         SCoord s;
         ll2sRaw (strikes[i].lat * (M_PIF / 180.0F),
                  strikes[i].lng * (M_PIF / 180.0F),
-                 s, 4);
+                 s, 8);
 
         if (s.x == 0 && s.y == 0)
             continue;
