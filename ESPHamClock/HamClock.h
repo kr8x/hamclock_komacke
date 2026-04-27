@@ -618,7 +618,8 @@ enum {
     X(BRB_SHOW_BME76,   "BME@76") \
     X(BRB_SHOW_BME77,   "BME@77") \
     X(BRB_SHOW_DXWX,    "DX Wx")  \
-    X(BRB_SHOW_DEWX,    "DE Wx")
+    X(BRB_SHOW_DEWX,    "DE Wx")  \
+    X(BRB_SHOW_LIGHTNING,"Lgtng")
 
 #define X(a,b)  a,                      // expands BRBMODES to enum and comma
 typedef enum {
@@ -2342,6 +2343,9 @@ extern void initLightning (void);
 extern void resetLightning (void);
 extern void updateLightning (void);
 extern void drawLightningOnMap (void);
+extern void doLightningTouch (void);
+extern uint8_t  ltg_worldwide;          // 1=worldwide, 0=radius mode
+extern uint16_t ltg_radius_km;          // search radius when not worldwide
 
 
 
@@ -2900,6 +2904,7 @@ extern bool retrieveDST (DSTData &a);
 
 extern void doNCDXFSpcWxTouch (const SCoord &s);
 extern void drawNCDXFSpcWxStats(uint16_t color);
+extern void drawNCDXFLightningStats(void);
 extern bool checkForNewSpaceWx(void);           // check for any new data or ...
 extern bool checkForNewDRAP(void);              // ... a few specific ones
 extern bool checkForNewAurora(void);            // ... a few specific ones
