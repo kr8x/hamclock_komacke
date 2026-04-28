@@ -88,6 +88,9 @@ OBJS = \
 	P13.o \
 	adif.o \
 	adif_parser.o \
+    antenna_lookup.o \
+	antennas.o \
+	antennas-html.o \
 	asknewpos.o \
 	astro.o \
 	bands.o \
@@ -189,7 +192,6 @@ help:
 	@printf "    B=backend                 - Set backend server default so -b is not required, format host:port\n"
 	@printf "    S=software                - Set software server default so -S is not required. format host.domain\n"
 	@printf "    T=time                    - Set timout default (seconds) so -b is not required if timout to backend need to be increased\n"
- 
 
 # supporting libs
 hclibs:
